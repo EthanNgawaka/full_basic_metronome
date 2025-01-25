@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="js/external/jspsych.js"></script>
+    <script src="js/external/plugin-preload.js"></script>
+    <script src="js/external/plugin-instructions-custom.js"></script>
+    <script src="js/external/plugin-html-keyboard-response.js"></script>
+    <script src="js/external/plugin-html-multi-keyboard-response.js"></script>
+    <script src="js/external/plugin-audio-multi-keyboard-response.js"></script>
+    <script src="js/external/plugin-html-button-response-custom.js"></script>
+    <script src="js/external/plugin-survey-likert.js"></script>
+    <script src="js/external/plugin-survey-html-form.js"></script>
+
+
+    <script src="js/scales.js"></script>
+    <link rel="stylesheet" href="css/jspsych.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+
+        .debrief {
+            max-width: 750px;
+            font-size: 18px;
+            line-height: 1.25em;
+            text-align: left;
+            color: black;
+            background-color: white;
+        }
+
+        .consent {
+            max-width: 750px;
+            font-size: 18px;
+            line-height: 1.25em;
+            text-align: left
+        }
+
+        .submit_bttn {
+            font-size: medium;
+            font-weight: bold;
+            margin: 0 auto;
+            display: block;
+            padding: 1rem 2rem;
+            background-color: lightskyblue;
+
+        }
+
+        .submit_bttn:hover {
+            cursor: pointer;
+            filter: brightness(var(--hover-brightness));
+        }
+
+
+        .ef_bttn {
+            align-items: center;
+            background-color: aliceblue;
+            border: 1px solid black;
+            border-radius: 12px;
+            box-shadow: transparent 0 0 0 3px, rgba(18, 18, 18, .1) 0 6px 20px;
+            box-sizing: border-box;
+            color: black;
+            cursor: pointer;
+            display: inline-flex;
+            flex: 1 1 auto;
+            font-weight: 400;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 72px;
+            justify-content: center;
+            line-height: 1;
+            margin: 0;
+            outline: none;
+            padding: 1rem 1.2rem;
+            text-align: center;
+            text-decoration: none;
+            transition: box-shadow .2s, -webkit-box-shadow .2s;
+            white-space: nowrap;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .ef_bttn:hover {
+            box-shadow: #121212 0 0 0 3px, transparent 0 0 0 0;
+        }
+
+        p {
+            max-width: 750px;
+            text-align: left
+        }
+
+
+    </style>
+</head>
+
+<body>
+</body>
+
+<script>
+    /* SETUP JSPSYCH */
+
+        // prompt the user if they try to leave the page...
+        let user_prompt = function (e) {
+            // Cancel the event
+            e.preventDefault(); // If you prevent default behavior in Mozilla Firefox prompt will always be shown
+            // Chrome requires returnValue to be set
+            e.returnValue = '';
+        }
+        window.addEventListener('beforeunload', user_prompt);
+
+
+    var jsPsych = initJsPsych();
+
+    // preload images
+    var preload = {
+        type: jsPsychPreload,
+        auto_preload: true,
+        images: "images/task_example.gif"
+    }
+
+        ////////////////////////////////////////////////////////////////////////////
+        /* GENERAL EXPERIMENT SETUP */
+
+        // could probably turn these all into a plug-in so we don't have to do it manually
+             let debrief = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: function () {
+                document.querySelector("body").style.backgroundColor = "white"
+                html = `
+                    <div class='debrief'>
+                       <p>Thank you for participating!</p>
+                  </div>
+    `
+                return html
+            },
+            choices: ['NO_KEYS']
+        };
+
+        let save_data = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `<p>... Saving your data...</p>`,
+            choices: ['NO_KEYS'],
+            on_load: function () {
+                // save the data
+                let url = 'save_data.php';
+                let data_in = jsPsych.data.get().join(jsPsych.data.getInteractionData()).csv();
+                let name = "RKE2-" + subject_id;
+                let data_to_send = {filename: name, filedata: data_in};
+
+                fetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify(data_to_send),
+                    headers: new Headers({
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    })
+                }).then(function (response) {
+                    console.log(response)
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    return Promise.reject(response);
+                }).then(function (data) {
+                    console.log(data);
+                    console.log("data saved")
+
+                }).catch(function (error) {
+                    console.warn(error);
+                    console.log(error)
+
+                }).finally(function (data) {
+                    // currently, just skips on even if the data has not saved properly...
+                    jsPsych.finishTrial();
+                })
+            }
+        }
+        let demographics = {
+            type: jsPsychSurveyHtmlForm,
+            preamble: `<p style="font-size:20px; text-align:left"> Please take a few minutes to respond to the demographic questions below by filling in the appropriate response. </p>
+                        `,
+            html: `<hr>
+                  <p style="font-size: 18px; text-align:left"><span style="margin-right: 10px">I identify my gender as (please specify):</span> <input name="gender" id="gender" type="text"> </p>
+                  <p style="font-size: 18px; text-align:left"><span style="margin-right: 10px">Age:</span>
+                  <input name="age" id="age" type="text"> </p>
+                  <p style="font-size: 18px; text-align:left"><span style="margin-right: 10px">Handedness: </span>
+                  <input id="Hand" type="radio" name="hand" value="Right"> Right
+                  <input id="Hand" type="radio" name="hand" value="Left"> Left
+                  <input id="Hand" type="radio" name="hand" value="Both"> Both
+                  </p>
+                  <p style="font-size: 18px; text-align:left"><span style="margin-right: 10px">Vision: </span><br>
+                         <input id="Vision" type="radio" name="vision" value="Normal"> Normal eyesight without needing glasses<br>
+                        <input id="Vision" type="radio" name="vision" value="Corrected"> Corrected Vision (wear glasses)<br>
+                        <input id="Vision" type="radio" name="vision" value="problems"> Poor eyesight and do not wear glasses<br>
+                  <hr>
+                  <p style="font-size: 18px; text-align:left"><span style="margin-right: 10px">If you would like to receive a summary of the results of this study, please add your email address here:</span><input name="email" id="email" type="text"> </p>
+                  <p style="font-size: 18px; text-align:left"><em>*Note that your email address will only be used to send you the results of the study, at which point it will be deleted. Information collected from the task and the questionnaires will not be connected to your personal information and will stay anonymous*</em></p>
+
+
+    `
+        }
+
+        // add URL parameters to the data frame
+        var subject_id = jsPsych.randomization.randomID(10);
+        var urlVars = jsPsych.data.urlVariables()
+        jsPsych.data.addProperties(urlVars)
+        jsPsych.data.addProperties({sub_id: subject_id})
+
+        // id fallback
+        let id = (urlVars.id) ? urlVars.id : (jsPsych.randomization.shuffle([1, 2])[0])
+
+        ///////////////////////////////////////////////////////////////////////////
+
+        /* TASK SPECIFIC */
+
+        // first instructions
+        let mrt_instructions = {
+            type: jsPsychInstructions,
+            pages: [
+                `   <p>Please note that this part of the experiment requires <strong>headphones or speakers.</strong></p>
+                    <p>You can use the buttons below or the arrow keys, to navigate through the instructions</p>`,
+
+                `<p>For this part of the experiment you will hear a metronome sound presented at a constant rate via the headphones.
+                    Your task is to press the spacebar in synchrony with the onset of the metronome so that you press the space bar exactly when each metronome sound is presented.`,
+
+                `<p>Your accuracy for this task is determined by how close in time your responses match the metronome.</p>`,
+
+                `<p>Throughout the task, we will periodically ask you about the content of your thoughts while you were performing the task.
+                Every once in a while, the task will temporarily stop and you will be presented with a screen asking you to indicate whether you were "ON TASK" or "OFF TASK"</p>`,
+
+                `<p>Being ON TASK means that, just before the screen appeared, you were focused on completing the task and were not thinking about anything unrelated to the task.
+                Some examples of ON TASK thoughts include thoughts about your performance on the task, thoughts about the metronome, or thoughts about your response.</p>`,
+
+                `<p>On the other hand, being OFF TASK means that, just before the screen appeared, you were thinking about something completely unrelated to the task.
+                Some examples of OFF TASK thoughts include thoughts about what to eat for dinner, thoughts about plans you have with friends, or thoughts about an upcoming test.</p>
+             <p>It is perfectly normal to think about things that are not related to the task.</p>`,
+
+                `<p>We would also like to know how often you remember what your OFF TASK thoughts were about.</p>
+             <p>Sometimes when you find yourself thinking about something unrelated to the task you can recall exactly what it was you were thinking about.
+                Other times, however, you may not remember exactly what you were thinking about, but still you <strong>know</strong> that you weren't focused on the task.</p>
+             <p>Again, this is perfectly normal.</p>`,
+
+                `<p>To answer these questions we will periodically pause the experiment and present the following screen. You will use the keyboard to respond.</p>
+             <p style="text-align: left"> "Which of the following responses best characterizes your mental state just prior to the presentation of this screen?</p>
+             <ul style="margin-bottom: .25em; text-align: left; list-style:none">
+                 <li style="margin-bottom: .25em; text-align: left; list-style:none">[PRESS 1] ON TASK </li>
+                 <li style="margin-bottom: .25em; text-align: left; list-style:none">[PRESS 2] OFF TASK and I remember what I was thinking about</li>
+                 <li style="margin-bottom: .25em; text-align: left; list-style:none">[PRESS 3] OFF TASK but I do <strong> NOT</strong> remember what I was thinking about"</li>
+              </ul>`,
+
+                `<p>Please try your best to honestly assess your thoughts and choose a response that best describes your thoughts at the time when we ask.</p>
+             <p>We will briefly review the response options again on the following pages.</p>`,
+
+                `<p>"[PRESS 1] ON TASK"</p><p> You should choose this response option when your thoughts <em>just before the screen appeared</em> were related to the task (e.g., thoughts about your performance, thoughts about the digits, or thoughts about your response).</p>
+             <p>In other words, you were focused on the task.</p>`,
+
+                `<p>"[PRESS 2] OFF TASK and I remember what I was thinking about"</p>
+             <p>You should choose this option when, <em>just before the screen appeared</em>, you can recall the content of your thoughts, and they were unrelated to the task (e.g., thoughts about what to eat for dinner, thoughts about plans with friends, or thoughts about an upcoming test).</p>
+             <p>In other words, you found yourself thinking about something other than the task and can recall the details of those thoughts.</p>`,
+
+                `<p>"[PRESS 3] OFF TASK but I do <strong>NOT</strong> remember what I was thinking about"</p>
+             <p>You should choose this option if you cannot recall the details of your thoughts <em>just before the screen appeared</em>, but you know that your thoughts were not on the task.</p>
+             <p>In other words, you should choose this option if you know you were NOT focused on the task, but you cannot recall the details or content of your thoughts.</p>`,
+
+
+                `<p>If you would like to review the instructions again, please use the buttons below.
+                    Remember, your task is to press the spacebar in synchrony with the onset of the metronome so that you press the space bar exactly when each metronome sound is presented.
+                    </p><p>Your accuracy is determined by how close your responses are in time to the metronome click. </p>
+                  <p>This part of the experiment will take about 15 minutes. We ask that you try to respond as accurately as possible throughout the whole task.</p>
+                  <p>If you are ready to begin, press "START" for the first trial</p>`
+            ],
+            show_clickable_nav: true,
+            button_label_last: "START",
+            button_label_last_background_color: "#4CAF50",
+            button_label_last_font_color: "white"
+        }
+
+        let mrt_instructions_2 = {
+            type: jsPsychInstructions,
+            pages: [
+                `<p>Great! You're now ready to begin the experimental block. This will be identical to the practice block. When you are ready to begin, press "START"</p>`
+            ],
+            show_clickable_nav: true,
+            button_label_last: "START",
+            button_label_last_background_color: "#4CAF50",
+            button_label_last_font_color: "white"
+        }
+        /* MRT */
+        let mrt_misses = 0
+        let mrt = {
+            timeline: [
+                {
+                    type: jsPsychHtmlMultiKeyboardResponse,
+                    stimulus: "",
+                    choices: [" "],
+                    trial_duration: 650,
+                    prompt:  `<img src="images/sound-icon.png">`,
+                    response_ends_trial: false,
+                    record_all_responses: true,
+                    data: {
+                        thought_probe: function(){return jsPsych.timelineVariable("thought_probe")}
+                    }
+                },
+                {
+                    type: jsPsychAudioMultiKeyboardResponse,
+                    stimulus: 'sounds/metronomeMono.mp3',
+                    choices: [' '],
+                    trial_duration: 650,
+                    prompt: `<img src="images/sound-icon.png">`,
+                    on_finish: function(){
+                        //track misses
+                        let last_two = jsPsych.data.get().last(2).values()
+                        if(last_two[0].rt.length === 0 && last_two[1].rt.length === 0){
+                            mrt_misses++
+                        } else {
+                            mrt_misses = 0
+                        }
+                    },
+                    response_ends_trial: false,
+                    record_all_responses: true,
+                    data: {
+                        thought_probe: function(){return jsPsych.timelineVariable("thought_probe")}
+                    }
+                },
+                {
+                    type: jsPsychHtmlKeyboardResponse,
+                    timeline: [
+                        {  stimulus: `<p style="font-size: 24pt; color:red">Error!</p>
+                                <p>You missed too many trials in a row.</p>
+                                <p>Press ENTER to continue</p>`,
+                            choices: ['ENTER'],
+                            post_trial_gap: 325}
+                    ],
+                    conditional_function: function() {
+                        if(mrt_misses > 4){
+                            mrt_misses = 0
+                            return true
+                        } else {
+                            return false
+                        }
+                    },
+                    data: {
+                        thought_probe: function(){return jsPsych.timelineVariable("thought_probe")}
+                    }
+                },
+                //4. Though Probe (conditional on whether it's a probe trial or not)
+                {
+                    timeline: [
+                        {
+                            type: jsPsychHtmlKeyboardResponse,
+                            stimulus: `<p style="font-size: 20pt; text-align: left; list-style: none">Which of the following responses best characterizes your mental state just prior to the presentation of this screen?</p>
+                            <ul style="font-size: 20pt; margin-bottom: .25em; text-align: left; list-style: none">
+                            <li style="font-size: 20pt; margin-bottom: .25em; text-align: left; list-style: none">[PRESS 1] ON TASK</li>
+                            <li style="font-size: 20pt; margin-bottom: .25em; text-align: left; list-style: none">[PRESS 2] OFF TASK and I remember what I was thinking about</li>
+                            <li style="font-size: 20pt; margin-bottom: .25em; text-align: left; list-style: none">[PRESS 3] OFF TASK but I do <strong>NOT</strong> remember what I was thinking about</li>
+                            </ul>`,
+                            choices: ['1','2','3'],
+                            data: {
+                                thought_probe: function(){return jsPsych.timelineVariable("thought_probe")}
+                            }
+                        },
+                        {
+                            type: jsPsychHtmlKeyboardResponse,
+                            stimulus: `<p style="font-size: 24pt; text-align: center">Press the spacebar to continue.</p>`,
+                            choices: [" "]
+                        },
+                        {
+                            type: jsPsychHtmlKeyboardResponse,
+                            stimulus: "",
+                            choices: [" "],
+                            trial_duration: 650,
+                            prompt:  `<img src="images/sound-icon.png">`,
+                            response_ends_trial: false
+                        }
+                    ],
+                    conditional_function: function() {
+                        return jsPsych.timelineVariable("thought_probe") === 1
+                    }
+                },
+            ],
+            timeline_variables: [
+                {thought_probe: 0},
+                {thought_probe: 1}
+            ],
+            sample: {
+                type: 'custom',
+                fn: function(t){
+                    let one = [0,0,0,0,0,
+                                0,0,0,0,0]
+                    let two = jsPsych.randomization.shuffle([0,0,0,0,0,
+                                                            0,0,0,0,0,
+                                                            0,0,0,0,1])
+
+                    let order = one.concat(two.concat(one))
+                    return order
+                }
+            },
+            repetitions: 8 // how many times to repeat trial block 16 ~= 15 mins -> 8 ~= 7.5 mins
+        }
+
+
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    /* TIMELINE */
+      let timeline = []
+
+
+
+    timeline = timeline.concat([mrt_instructions, mrt])
+
+    timeline = timeline.concat([demographics, save_data, debrief])
+    jsPsych.run(timeline)
+
+
+</script>
+
+</html>
